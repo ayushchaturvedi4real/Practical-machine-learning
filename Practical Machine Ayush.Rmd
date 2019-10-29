@@ -1,0 +1,114 @@
+---
+title: "Practical Machine Learning Project week 4"
+author: "Ayush Chaturvedi"
+
+date: 20th Oct 2019
+output:
+  html_document: default
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning=FALSE, message=FALSE, fig.width=10, fig.height=5)
+options(width=120)
+library(lattice)
+library(ggplot2)
+library(plyr)
+library(caret)
+library(corrplot)
+library(randomForest)
+```
+
+# Building the model
+
+
+We do the the following steps:
+
+- Exploratory data analysis on the test data set
+- Select a model which is right with the predictons
+- Predict the classification of the model on the given test set
+
+## Pre-processingg
+
+
+```{r}
+
+training <- read.csv("pml-training.csv")
+testing <- read.csv("pml-testing.csv")
+# create a partition with the training dataset 
+inTrain  <- createDataPartition(training$classe, p=0.7, list=FALSE)
+TrainSet <- training[inTrain, ]
+TestSet  <- training[-inTrain, ]
+dim(TrainSet)
+```
+
+Both created datasets have 160 variables. Those variables have plenty of NA, so that can be removed with the cleaning procedures below. The Near Zero variance (NZV) variables are also removed and the ID variables also as well.
+
+```{r}
+
+NZV <- nearZeroVar(TrainSet)
+TrainSet <- TrainSet[, -NZV]
+TestSet  <- TestSet[, -NZV]
+dim(TrainSet)
+
+```
+```{r}
+dim(TestSet)
+```
+
+
+```{r}
+AllNA    <- sapply(TrainSet, function(x) mean(is.na(x))) > 0.95
+TrainSet <- TrainSet[, AllNA==FALSE]
+TestSet  <- TestSet[, AllNA==FALSE]
+dim(TrainSet)
+```
+
+```{r}
+dim(TestSet)
+```
+# remove identification from only variables (columns 1 to 5)
+```{r}
+TrainSet <- TrainSet[, -(1:5)]
+TestSet  <- TestSet[, -(1:5)]
+dim(TrainSet)
+```
+
+# Correlation Analysis performed
+
+```{r}
+corMatrix <- cor(TrainSet[, -54])
+corrplot(corMatrix, order = "FPC", method = "color", type = "lower", 
+         tl.cex = 0.8, tl.col = rgb(0, 0, 0))
+```
+# Random forest model is applied and trained 
+```{r}
+
+set.seed(211)
+controlRF <- trainControl(method="cv", number=3, verboseIter=FALSE)
+modFitRandForest <- train(classe ~ ., data=TrainSet, method="rf",
+                          trControl=controlRF)
+modFitRandForest$finalModel
+```
+
+```{r}
+
+predictRandForest <- predict(modFitRandForest, newdata=TestSet)
+confMatRandForest <- confusionMatrix(predictRandForest, TestSet$classe)
+confMatRandForest
+```
+
+
+# plot the new matrix results
+```{r}
+plot(confMatRandForest$table, col = confMatRandForest$byClass, 
+     main = paste("Random Forest - Accuracy =",
+                  round(confMatRandForest$overall['Accuracy'], 4)))
+```
+
+# Prediction of the following models, in this case random forest is good
+```{r}
+predictTEST <- predict(modFitRandForest, newdata=testing)
+predictTEST
+```
+
